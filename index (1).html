@@ -1,0 +1,89 @@
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>مخزن قطع الغيار</title><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#1b4f72"><style>
+*{box-sizing:border-box}body{margin:0;font:18px/1.5 Tahoma,Arial,sans-serif;background:#f3f5f7;color:#111;padding-bottom:76px}
+main{padding:12px;max-width:640px;margin:auto}h2{margin:.3em 0}
+input,select,textarea{width:100%;font:inherit;padding:12px;border:2px solid #9ab;border-radius:10px;margin:4px 0 10px;background:#fff}
+button{font:inherit;padding:14px;border:0;border-radius:12px;background:#1b4f72;color:#fff;margin:3px 0;min-width:70px}
+button.g{background:#1e8449}button.r{background:#b03a2e}button.w{background:#7f8c8d}button:disabled{opacity:.5}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.card{background:#fff;border-radius:12px;padding:12px;margin:8px 0;box-shadow:0 1px 3px #0003}
+.low{border-right:8px solid #d68910}.bad{background:#fdecea;color:#922;padding:10px;border-radius:10px;margin:8px 0}.ok{background:#e8f6ef;color:#145;padding:10px;border-radius:10px;margin:8px 0}
+nav{position:fixed;bottom:0;right:0;left:0;display:flex;background:#1b4f72}nav button{flex:1;border-radius:0;background:none;padding:10px 2px;font-size:14px;margin:0;min-width:0}
+small{color:#566}.row{display:flex;gap:6px}.row>*{flex:1}</style></head><body><main id="m"></main>
+<nav><button onclick="go('home')">🏠<br>الرئيسية</button><button onclick="go('stock')">📦<br>المخزون</button><button onclick="go('mv',{t:'in'})">⬇️<br>وارد</button><button onclick="go('mv',{t:'out'})">⬆️<br>منصرف</button><button onclick="go('log')">📜<br>السجل</button><button onclick="go('more')">⚙️<br>المزيد</button></nav>
+<script>
+const K='inv1',$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let D;try{D=JSON.parse(localStorage.getItem(K)||'')||0}catch(e){D=0}
+if(!D||!D.items)D={items:[],moves:[]};
+let V='home',P={},M='';
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+bal=c=>D.moves.reduce((a,m)=>m.c==c?a+m.d:a,0),
+it=c=>D.items.find(i=>i.c==c),fmt=t=>new Date(t).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'}),
+nowL=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16),
+TN={in:'وارد ⬇️',out:'منصرف ⬆️',open:'رصيد افتتاحي 🏁',rev:'تصحيح ↩️'},
+low=i=>i.min!==''&&i.min!=null&&bal(i.c)<=+i.min,
+hit=(i,q)=>!q||[i.c,i.name,i.oem,i.brand,i.cat].join(' ').toLowerCase().includes(q.toLowerCase());
+function save(){try{localStorage.setItem(K,JSON.stringify(D));localStorage.setItem(K+'t',Date.now());return 1}catch(e){alert('⚠️ فشل حفظ البيانات! صدّر نسخة احتياطية الآن.');return 0}}
+function go(v,p){V=v;P=p||{};M='';render()}
+function render(){$('#m').innerHTML=({home,stock,mv,log,more,item})[V]();window.scrollTo(0,0);if(V=='stock')lst();if(V=='log')llog()}
+const msg=()=>M?`<div class="${M[0]=='!'?'bad':'ok'}">${esc(M.replace(/^!/,''))}</div>`:'';
+function addMove(c,t,q,o){q=+q;if(!(q>0)||!Number.isFinite(q))return'!الكمية يجب أن تكون أكبر من صفر';if(!it(c))return'!اختر صنفًا مسجلًا من القائمة';
+if(o.id&&D.moves.some(m=>m.id==o.id))return'!تم تسجيل هذه الحركة من قبل';
+const d=t=='out'?-q:q,b=bal(c)+d;if(b<0)return`!الرصيد المتاح (${bal(c)}) لا يكفي لهذه الكمية`;
+D.moves.push({id:o.id||uid(),c,t,d,b,ts:o.ts||Date.now(),ref:o.ref||'',pa:o.pa||'',n:o.n||'',rf:o.rf||''});
+if(!save()){D.moves.pop();return'!فشل الحفظ'}return'ok:'+b}
+function home(){const l=D.items.filter(low).length,lm=[...D.moves].reverse().slice(0,5);
+return`<h2>مخزن قطع الغيار</h2>${sv()}<div class="grid"><div class="card">📦 الأصناف<br><b>${D.items.length}</b></div><div class="card ${l?'low':''}">⚠️ تحتاج إعادة طلب<br><b>${l}</b></div></div>
+<input id="q" placeholder="🔍 بحث بالاسم أو الكود أو رقم القطعة" onkeydown="if(event.key=='Enter')go('stock',{q:this.value})">
+<div class="grid"><button class="g" onclick="go('mv',{t:'in'})">⬇️ تسجيل وارد</button><button class="r" onclick="go('mv',{t:'out'})">⬆️ تسجيل منصرف</button><button onclick="go('item',{})">➕ إضافة صنف</button><button onclick="go('stock',{q:$('#q').value})">🔍 بحث</button></div>
+${l?`<button class="w" style="width:100%" onclick="go('stock',{low:1})">عرض الأصناف المنخفضة</button>`:''}
+<h3>آخر الحركات</h3>${lm.map(mr).join('')||'<small>لا توجد حركات بعد</small>'}`}
+function sv(){const t=localStorage.getItem(K+'t');return`<small>آخر حفظ: ${t?fmt(+t):'—'} (على هذا الهاتف)</small>`}
+function mr(m){const i=it(m.c)||{};return`<div class="card"><b>${TN[m.t]}</b> ${m.d>0?'+':''}${m.d} ${esc(i.unit)} — ${esc(i.name)}<br><small>${esc(m.c)} • ${fmt(m.ts)} • الرصيد بعدها: ${m.b}</small></div>`}
+function stock(){return`<h2>المخزون</h2><input id="q" value="${esc(P.q)}" placeholder="🔍 اسم / كود / رقم أصلي / ماركة" oninput="P.q=this.value;lst()"><label><input type="checkbox" style="width:auto" ${P.low?'checked':''} onchange="P.low=this.checked;lst()"> المنخفضة فقط</label><button onclick="go('item',{})" style="width:100%">➕ صنف جديد</button><div id="l"></div>`}
+function lst(){const r=D.items.filter(i=>hit(i,P.q)&&(!P.low||low(i)));$('#l').innerHTML=r.map(i=>`<div class="card ${low(i)?'low':''}"><b>${esc(i.name)}</b> <small>${esc(i.c)}</small><br>الرصيد: <b>${bal(i.c)}</b> ${esc(i.unit)} ${low(i)?'⚠️ منخفض':''}<small> ${i.loc?'• '+esc(i.loc):''}</small><div class="row"><button class="g" onclick="go('mv',{t:'in',c:'${esc(i.c)}'})">وارد</button><button class="r" onclick="go('mv',{t:'out',c:'${esc(i.c)}'})">منصرف</button><button class="w" onclick="go('item',{c:'${esc(i.c)}'})">تعديل</button><button class="w" onclick="go('log',{q:'${esc(i.c)}'})">سجل</button></div></div>`).join('')||`<div class="card">لا توجد نتائج. <button onclick="go('item',{})">➕ إضافة صنف جديد</button></div>`}
+function item(){const i=P.c?it(P.c):{};return`<h2>${P.c?'تعديل صنف':'صنف جديد'}</h2>${msg()}
+كود الصنف *<input id="c" value="${esc(i.c)}" ${P.c?'readonly':''}>اسم القطعة *<input id="n" value="${esc(i.name)}">التصنيف<input id="ct" value="${esc(i.cat)}">الماركة<input id="b" value="${esc(i.brand)}">رقم القطعة الأصلي<input id="o" value="${esc(i.oem)}">
+وحدة القياس<input id="u" value="${esc(i.unit||'قطعة')}">${P.c?'':'الرصيد الافتتاحي<input id="op" type="number" min="0" value="0">'}حد إعادة الطلب<input id="mn" type="number" min="0" value="${esc(i.min)}">مكان التخزين<input id="l2" value="${esc(i.loc)}">ملاحظات<textarea id="nt">${esc(i.note)}</textarea>
+<button style="width:100%" onclick="svI()">💾 حفظ</button><button class="w" style="width:100%" onclick="go('stock')">إلغاء</button>`}
+function svI(){const g=x=>$('#'+x).value.trim(),c=g('c'),n=g('n');
+if(!c||!n){M='!كود الصنف والاسم مطلوبان';return render()}
+const o={c,name:n,cat:g('ct'),brand:g('b'),oem:g('o'),unit:g('u')||'قطعة',min:g('mn'),loc:g('l2'),note:g('nt')};
+if(P.c){Object.assign(it(P.c),o);save();return go('stock')}
+if(it(c)){M='!هذا الكود مسجل من قبل، اختر كودًا آخر';return render()}
+const q=+(($('#op')||{}).value||0);if(q<0){M='!الرصيد لا يمكن أن يكون سالبًا';return render()}
+D.items.push(o);if(q>0)D.moves.push({id:uid(),c,t:'open',d:q,b:q,ts:Date.now(),ref:'',pa:'',n:'رصيد افتتاحي',rf:''});save();go('stock',{q:c})}
+function mv(){const t=P.t,i=P.c?it(P.c):null;P.id=P.id||uid();
+return`<h2>${t=='in'?'⬇️ تسجيل وارد':'⬆️ تسجيل منصرف'}</h2>${msg()}
+الصنف *<input id="c" list="dl" value="${esc(P.c)}" placeholder="اكتب الكود أو الاسم" onchange="P.c=this.value;pk()"><datalist id="dl">${D.items.map(i=>`<option value="${esc(i.c)}">${esc(i.name)} ${esc(i.oem)} ${esc(i.brand)}</option>`).join('')}</datalist><div id="pi"><small>${i?esc(i.name)+' — الرصيد: '+bal(i.c)+' '+esc(i.unit):''}</small></div>
+الكمية *<input id="q" type="number" inputmode="decimal" min="0" step="any">الوقت<input id="d" type="datetime-local" value="${nowL()}">رقم الإذن / الفاتورة<input id="r">${t=='in'?'المورد':'جهة الصرف'}<input id="p">ملاحظات<input id="nt">
+<button id="sb" class="${t=='in'?'g':'r'}" style="width:100%" onclick="svM()">💾 حفظ</button>`}
+function pk(){const i=it($('#c').value.trim());P.c=i?i.c:$('#c').value;$('#pi').innerHTML=`<small>${i?esc(i.name)+' — الرصيد: '+bal(i.c)+' '+esc(i.unit):'غير مسجل'}</small>`}
+function svM(){const b=$('#sb');b.disabled=true;const c=$('#c').value.trim(),
+r=addMove(c,P.t,$('#q').value,{id:P.id,ts:new Date($('#d').value).getTime()||Date.now(),ref:$('#r').value,pa:$('#p').value,n:$('#nt').value});
+if(r.startsWith('ok:')){const i=it(c);P={t:P.t,c};M=`✅ تم الحفظ. الرصيد الجديد: ${r.slice(3)} ${i.unit}`}else{M=r;P.c=c;b.disabled=false}
+render()}
+function log(){return`<h2>سجل الحركات</h2><input id="q" value="${esc(P.q)}" placeholder="🔍 اسم أو كود" oninput="P.q=this.value;llog()"><select id="ty" onchange="P.ty=this.value;llog()"><option value="">الكل</option><option value="in" ${P.ty=='in'?'selected':''}>وارد</option><option value="out" ${P.ty=='out'?'selected':''}>منصرف</option></select><div class="row"><input type="date" id="f" value="${P.f||''}" onchange="P.f=this.value;llog()"><input type="date" id="to" value="${P.to||''}" onchange="P.to=this.value;llog()"></div>${msg()}<div id="l"></div>`}
+function fl(){const f=P.f?new Date(P.f).getTime():0,e=P.to?new Date(P.to).getTime()+864e5:1e15;return D.moves.filter(m=>{const i=it(m.c)||{};return(!P.q||hit(i,P.q)||m.c==P.q)&&(!P.ty||m.d*(P.ty=='in'?1:-1)>0&&m.t!='open')&&m.ts>=f&&m.ts<e}).sort((a,b)=>b.ts-a.ts)}
+function llog(){$('#l').innerHTML=fl().slice(0,200).map(m=>{const i=it(m.c)||{};return`<details class="card"><summary>${TN[m.t]} ${m.d>0?'+':''}${m.d} — ${esc(i.name)} ${m.rv?'(مُصحّحة)':''}<br><small>${fmt(m.ts)} • الرصيد بعدها: ${m.b}</small></summary><p>كود: ${esc(m.c)}<br>مرجع: ${esc(m.ref)||'—'}<br>الجهة: ${esc(m.pa)||'—'}<br>ملاحظات: ${esc(m.n)||'—'}${m.rf?'<br>تصحيح للحركة: '+esc(m.rf):''}</p>${m.t!='rev'&&!m.rv?`<button class="w" onclick="rv('${m.id}')">↩️ تصحيح / إلغاء الحركة</button>`:''}</details>`}).join('')||'<div class="card">لا توجد حركات</div>'}
+function rv(id){const m=D.moves.find(x=>x.id==id);if(!confirm('سيتم تسجيل حركة عكسية تلغي أثر هذه الحركة، وتبقى الأصلية في السجل. متابعة؟'))return;
+const d=-m.d,b=bal(m.c)+d;if(b<0){M='!لا يمكن التصحيح لأن الرصيد سيصبح سالبًا';return render()}
+D.moves.push({id:uid(),c:m.c,t:'rev',d,b,ts:Date.now(),ref:m.ref,pa:m.pa,n:'تصحيح حركة',rf:m.id});m.rv=1;save();M='✅ تم التصحيح';render()}
+function more(){return`<h2>التقارير والنسخ الاحتياطي</h2>${msg()}${sv()}<div class="card"><b>تقرير فترة</b><div class="row"><input type="date" id="f"><input type="date" id="to"></div><button style="width:100%" onclick="rp()">إجمالي الوارد والمنصرف</button><div id="rs"></div></div>
+<div class="card"><b>تصدير Excel (CSV)</b><button style="width:100%" onclick="ex(0)">الأرصدة الحالية</button><button style="width:100%" onclick="ex(1)">سجل كل الحركات</button><button style="width:100%" onclick="ex(2)">الأصناف المنخفضة</button></div>
+<div class="card"><b>نسخة احتياطية</b><button class="g" style="width:100%" onclick="bk()">⬇️ حفظ نسخة احتياطية</button><p>استعادة من ملف (تستبدل البيانات الحالية بعد التأكيد):</p><input type="file" accept=".json" onchange="rs(this.files[0])"></div>
+<div class="card"><b>استيراد أصناف من CSV</b><br><small>الأعمدة بالترتيب: كود،اسم،تصنيف،ماركة،رقم أصلي،وحدة،رصيد،حد،مكان (سطر لكل صنف، بدون عناوين)</small><input type="file" accept=".csv,.txt" onchange="im(this.files[0])"></div>`}
+function rp(){const f=$('#f').value?new Date($('#f').value).getTime():0,e=$('#to').value?new Date($('#to').value).getTime()+864e5:1e15;let a=0,o=0;D.moves.forEach(m=>{if(m.ts>=f&&m.ts<e){if(m.t=='in')a+=m.d;if(m.t=='out')o-=m.d}});$('#rs').innerHTML=`<p>الوارد: <b>${a}</b><br>المنصرف: <b>${o}</b></p>`}
+function dl(n,t,ty){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:ty}));a.download=n;a.click()}
+const cs=r=>r.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(',');
+function ex(k){let r;if(k==1)r=[['التاريخ','الكود','الصنف','النوع','الكمية','الرصيد بعدها','مرجع','الجهة','ملاحظات']].concat(D.moves.map(m=>[new Date(m.ts).toLocaleString('en-GB'),m.c,(it(m.c)||{}).name,TN[m.t],m.d,m.b,m.ref,m.pa,m.n]));
+else r=[['الكود','الاسم','التصنيف','الماركة','رقم أصلي','الوحدة','الرصيد','حد الطلب','المكان']].concat(D.items.filter(i=>k==0||low(i)).map(i=>[i.c,i.name,i.cat,i.brand,i.oem,i.unit,bal(i.c),i.min,i.loc]));
+dl('report.csv','\ufeff'+r.map(cs).join('\r\n'),'text/csv;charset=utf-8')}
+function bk(){dl('backup-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(D),'application/json');M='✅ تم إنشاء ملف النسخة الاحتياطية، احفظه في مكان آمن';render()}
+function rs(f){if(!f)return;f.text().then(t=>{try{const x=JSON.parse(t);if(!Array.isArray(x.items)||!Array.isArray(x.moves))throw 0;
+if(!confirm(`⚠️ ستُستبدل البيانات الحالية (${D.items.length} صنف، ${D.moves.length} حركة) بالنسخة (${x.items.length} صنف، ${x.moves.length} حركة). متابعة؟`))return;
+localStorage.setItem(K+'prev',JSON.stringify(D));D=x;save();M='✅ تمت الاستعادة';render()}catch(e){M='!الملف غير صالح';render()}})}
+function im(f){if(!f)return;f.text().then(t=>{let n=0,s=0;t.replace(/^\ufeff/,'').split(/\r?\n/).forEach(l=>{const a=l.split(',').map(x=>x.replace(/^"|"$/g,'').trim());if(!a[0]||!a[1]||it(a[0])){if(a[0])s++;return}
+const q=+a[6]||0;D.items.push({c:a[0],name:a[1],cat:a[2]||'',brand:a[3]||'',oem:a[4]||'',unit:a[5]||'قطعة',min:a[7]||'',loc:a[8]||'',note:''});if(q>0)D.moves.push({id:uid(),c:a[0],t:'open',d:q,b:q,ts:Date.now(),ref:'',pa:'',n:'رصيد افتتاحي',rf:''});n++});save();M=`✅ أُضيف ${n} صنف، وتم تخطي ${s} مكرر`;render()})}
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+render();
+</script></body></html>
